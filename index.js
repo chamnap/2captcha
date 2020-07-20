@@ -1,7 +1,7 @@
 /*
-	index.js
-	Sander Kastelein <sander@sanderkastelein.nl>
-	2015-04-03
+    index.js
+    Sander Kastelein <sander@sanderkastelein.nl>
+    2015-04-03
 */
 "use strict";
 
@@ -216,6 +216,63 @@ module.exports.decodeRecaptchaV2 = function(googlekey,pageurl,options,callback){
         method: "userrecaptcha",
         key: apiKey,
         googlekey: googlekey,
+        pageurl: pageurl
+    };
+
+    postData = querystring.stringify(postData);
+
+    var request = http.request(httpRequestOptions, function(response) {
+        var body = '';
+
+        response.on('data', function(chunk) {
+            body += chunk;
+        });
+
+        response.on('end', function() {
+            var result = body.split('|');
+            if (result[0] !== 'OK'){
+                return callback(result[0]);
+            }
+
+            pollCaptcha(result[1], options, function(error){
+
+
+                var callbackToInitialCallback = callback;
+
+                module.exports.report(this.captchaId);
+
+                if(error){
+                    return callbackToInitialCallback('CAPTCHA_FAILED');
+                }
+
+                if(!this.options.retries){
+                    this.options.retries = defaultOptions.retries;
+                }
+                if(this.options.retries > 1){
+                    this.options.retries = this.options.retries - 1;
+                    module.exports.decode(base64, this.options, callback);
+                }else{
+                    callbackToInitialCallback('CAPTCHA_FAILED_TOO_MANY_TIMES');
+                }
+            }, callback);
+        });
+    });
+    request.write(postData)
+    request.end();
+}
+
+module.exports.decodehCaptcha = function(sitekey,pageurl,options,callback) {
+  if(!callback){
+        callback = options;
+        options = defaultOptions;
+    }
+    var httpRequestOptions = url.parse(apiInUrl);
+    httpRequestOptions.method = 'POST';
+
+    var postData = {
+        method: "hcaptcha",
+        key: apiKey,
+        sitekey: sitekey,
         pageurl: pageurl
     };
 
